@@ -16,7 +16,7 @@ import java.lang.ref.WeakReference;
 import java.util.List;
 
 public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
-    private File imagesFile;
+    private File[] mImageFiles;
     private Bitmap placeHolderBitmap;
 
     public static class AsyncDrawable extends BitmapDrawable{
@@ -35,8 +35,8 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
         }
     }
 
-    public ImageAdapter(File folderFile){
-        imagesFile = folderFile;
+    public ImageAdapter(File[] folderFiles){
+        mImageFiles = folderFiles;
     }
 
     @NonNull
@@ -49,10 +49,15 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder viewHolder, int position) {
-        File imageFile = imagesFile.listFiles()[position];
+        //File imageFile = imagesFile.listFiles()[position];
         //BitmapWorkerTask workerTask = new BitmapWorkerTask(viewHolder.getImageView());
         //workerTask.execute(imageFile);
-        if (checkBitmapWorkerTask(imagesFile, viewHolder.getImageView())){
+        File imageFile = mImageFiles[position];
+        Bitmap bitmap = CameraIntentActivity.getBitmapFromMemoryCache(imageFile.getName());
+        if (bitmap!= null){
+            viewHolder.getImageView().setImageBitmap(bitmap);
+        } else
+        if (checkBitmapWorkerTask(imageFile, viewHolder.getImageView())){
             BitmapWorkerTask bitmapWorkerTask = new BitmapWorkerTask(viewHolder.getImageView());
             AsyncDrawable asyncDrawable = new AsyncDrawable(viewHolder.getImageView().getResources(),
                     placeHolderBitmap,
@@ -64,7 +69,8 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
 
     @Override
     public int getItemCount() {
-        return imagesFile.listFiles().length;
+        //return imagesFile.listFiles().length;
+        return mImageFiles.length;
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder{

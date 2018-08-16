@@ -22,7 +22,10 @@ public class BitmapWorkerTask extends AsyncTask<File, Void, Bitmap>{
     @Override
     protected Bitmap doInBackground(File... params) {
         mImageFile = params[0];
-        return decodeBitmapFromFile(params[0]);
+        //return decodeBitmapFromFile(params[0]);
+        Bitmap bitmap = decodeBitmapFromFile(mImageFile);
+        CameraIntentActivity.setBitmapToMemoryCache(mImageFile.getName(), bitmap);
+        return bitmap;
     }
 
     @Override

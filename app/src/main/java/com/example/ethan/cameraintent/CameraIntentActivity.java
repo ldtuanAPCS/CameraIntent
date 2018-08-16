@@ -19,19 +19,24 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.LruCache;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 
 public class CameraIntentActivity extends AppCompatActivity {
 
     private static final int ACTIVITY_START_CAMERA_APP = 0;
     private static final int REQUEST_EXTERNAL_STORAGE_RESULT = 1;
+    private static LruCache<String, Bitmap> mMemoryCache;
     private ImageView mCaptureView;
     private String mImageFileLocation = "" ;
     private String GALLERY_LOCATION = "image gallery";
@@ -48,8 +53,17 @@ public class CameraIntentActivity extends AppCompatActivity {
         mRecyclerView = (RecyclerView) findViewById(R.id.galleryRecyclerView);
         RecyclerView.LayoutManager layoutManager = new GridLayoutManager(this, 1);
         mRecyclerView.setLayoutManager(layoutManager);
-        RecyclerView.Adapter imageAdapter = new ImageAdapter(mGalleryFolder);
+        RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder));
         mRecyclerView.setAdapter(imageAdapter);
+
+        final int maxMemorySize = (int) Runtime.getRuntime().maxMemory() / 1024;
+        final int cacheSize = maxMemorySize / 10;
+        mMemoryCache = new LruCache<String, Bitmap>(cacheSize){
+            @Override
+            protected int sizeOf(String key, Bitmap value) {
+                return value.getByteCount() / 1024;
+            }
+        };
     }
 
     public void takePhoto(View view){
@@ -102,7 +116,7 @@ public class CameraIntentActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ACTIVITY_START_CAMERA_APP && resultCode == RESULT_OK){
 //            rotateImage(setReducedImageSize());
-            RecyclerView.Adapter newImageAdapter = new ImageAdapter(mGalleryFolder);
+            RecyclerView.Adapter newImageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder));
             mRecyclerView.swapAdapter(newImageAdapter, false);
         }
     }
@@ -158,5 +172,26 @@ public class CameraIntentActivity extends AppCompatActivity {
         }
         Bitmap rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
         mCaptureView.setImageBitmap(rotatedBitmap);
+    }
+
+    private File[] sortFilesToLatest(File fileImagesDir){
+        File[] files = fileImagesDir.listFiles();
+        Arrays.sort(files, new Comparator<File>() {
+            @Override
+            public int compare(File lhs, File rhs) {
+                return Long.valueOf(rhs.lastModified()).compareTo(lhs.lastModified());
+            }
+        });
+        return files;
+    }
+
+    public static Bitmap getBitmapFromMemoryCache(String key){
+        return mMemoryCache.get(key);
+    }
+
+    public static void setBitmapToMemoryCache(String key, Bitmap bitmap){
+        if (getBitmapFromMemoryCache(key) == null) {
+            mMemoryCache.put(key, bitmap);
+        }
     }
 }
