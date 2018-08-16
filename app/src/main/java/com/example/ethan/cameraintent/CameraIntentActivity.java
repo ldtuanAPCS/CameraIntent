@@ -17,6 +17,8 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -32,13 +34,22 @@ public class CameraIntentActivity extends AppCompatActivity {
     private static final int REQUEST_EXTERNAL_STORAGE_RESULT = 1;
     private ImageView mCaptureView;
     private String mImageFileLocation = "" ;
+    private String GALLERY_LOCATION = "image gallery";
+    private File mGalleryFolder;
+    private RecyclerView mRecyclerView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera_intent);
-        mCaptureView = (ImageView) findViewById(R.id.capturePhotoImageView);
+        createImageGallery();
+//        mCaptureView = (ImageView) findViewById(R.id.capturePhotoImageView);
 
+        mRecyclerView = (RecyclerView) findViewById(R.id.galleryRecyclerView);
+        RecyclerView.LayoutManager layoutManager = new GridLayoutManager(this, 1);
+        mRecyclerView.setLayoutManager(layoutManager);
+        RecyclerView.Adapter imageAdapter = new ImageAdapter(mGalleryFolder);
+        mRecyclerView.setAdapter(imageAdapter);
     }
 
     public void takePhoto(View view){
@@ -90,15 +101,25 @@ public class CameraIntentActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ACTIVITY_START_CAMERA_APP && resultCode == RESULT_OK){
-            rotateImage(setReducedImageSize());
+//            rotateImage(setReducedImageSize());
+            RecyclerView.Adapter newImageAdapter = new ImageAdapter(mGalleryFolder);
+            mRecyclerView.swapAdapter(newImageAdapter, false);
         }
+    }
+
+    private void createImageGallery(){
+        File storageDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+        mGalleryFolder = new File(storageDirectory, GALLERY_LOCATION);
+        if (!mGalleryFolder.exists()){
+            mGalleryFolder.mkdirs();
+        }
+
     }
 
     private File createImageFile() throws IOException{
         String timestamp = new SimpleDateFormat("ddMMyyyy_HHmmss").format(new Date());
         String imageFileName = "IMAGE_" + timestamp + '_';
-        File storageDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
-        File image = File.createTempFile(imageFileName, ".jpeg", storageDirectory);
+        File image = File.createTempFile(imageFileName, ".jpeg", mGalleryFolder);
         mImageFileLocation = image.getAbsolutePath();
         return image;
     }
