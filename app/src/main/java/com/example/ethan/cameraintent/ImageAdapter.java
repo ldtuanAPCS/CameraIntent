@@ -8,7 +8,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-
 import java.io.File;
 
 public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
@@ -29,8 +28,10 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
     @Override
     public void onBindViewHolder(@NonNull ViewHolder viewHolder, int position) {
         File imageFile = imagesFile.listFiles()[position];
-        Bitmap imageBitmap = BitmapFactory.decodeFile(imageFile.getAbsolutePath());
-        viewHolder.getImageView().setImageBitmap(imageBitmap);
+//        Bitmap imageBitmap = BitmapFactory.decodeFile(imageFile.getAbsolutePath());
+//        viewHolder.getImageView().setImageBitmap(imageBitmap);
+        BitmapWorkerTask workerTask = new BitmapWorkerTask(viewHolder.getImageView());
+        workerTask.execute(imageFile);
     }
 
     @Override
