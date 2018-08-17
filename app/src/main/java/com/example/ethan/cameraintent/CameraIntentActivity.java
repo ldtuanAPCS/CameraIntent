@@ -18,6 +18,7 @@ import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.LruCache;
 import android.view.View;
@@ -26,11 +27,16 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.SoftReference;
 import java.lang.reflect.Array;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 public class CameraIntentActivity extends AppCompatActivity {
 
@@ -42,6 +48,7 @@ public class CameraIntentActivity extends AppCompatActivity {
     private String GALLERY_LOCATION = "image gallery";
     private File mGalleryFolder;
     private RecyclerView mRecyclerView;
+    private static Set<SoftReference<Bitmap>> mReuseableBitmap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,20 +58,32 @@ public class CameraIntentActivity extends AppCompatActivity {
 //        mCaptureView = (ImageView) findViewById(R.id.capturePhotoImageView);
 
         mRecyclerView = (RecyclerView) findViewById(R.id.galleryRecyclerView);
-        RecyclerView.LayoutManager layoutManager = new GridLayoutManager(this, 1);
+        GridLayoutManager layoutManager = new GridLayoutManager(this, 1);
+        layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
         mRecyclerView.setLayoutManager(layoutManager);
         RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder));
         mRecyclerView.setAdapter(imageAdapter);
 
         final int maxMemorySize = (int) Runtime.getRuntime().maxMemory() / 1024;
-        final int cacheSize = maxMemorySize / 10;
+        final int cacheSize = maxMemorySize / 20;
         mMemoryCache = new LruCache<String, Bitmap>(cacheSize){
+
+            @Override
+            protected void entryRemoved(boolean evicted, String key, Bitmap oldValue, Bitmap newValue) {
+                super.entryRemoved(evicted, key, oldValue, newValue);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1) {
+                    mReuseableBitmap.add(new SoftReference<Bitmap>(oldValue));
+                }
+            }
+
             @Override
             protected int sizeOf(String key, Bitmap value) {
                 return value.getByteCount() / 1024;
             }
         };
-
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1) {
+            mReuseableBitmap = Collections.synchronizedSet(new HashSet<SoftReference<Bitmap>>());
+        }
     }
 
     public void takePhoto(View view){
@@ -194,5 +213,51 @@ public class CameraIntentActivity extends AppCompatActivity {
         if (getBitmapFromMemoryCache(key) == null) {
             mMemoryCache.put(key, bitmap);
         }
+    }
+
+    private static int getBytePerPixel(Bitmap.Config config){
+        if (config == Bitmap.Config.ARGB_8888){
+            return 4;
+        } else if (config == Bitmap.Config.RGB_565 || config == Bitmap.Config.ARGB_4444){
+            return 2;
+        } else if (config == Bitmap.Config.ALPHA_8){
+            return 1;
+        }
+        return 1;
+    }
+
+    private static boolean canUseForBitmap(Bitmap candidate, BitmapFactory.Options options){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
+            int width = options.outWidth / options.inSampleSize;
+            int height = options.outHeight / options.inSampleSize;
+            int byteCount = width * height *getBytePerPixel(candidate.getConfig());
+            return byteCount <= candidate.getAllocationByteCount();
+        }
+        return candidate.getWidth() == options.outWidth &&
+                candidate.getHeight() == options.outHeight &&
+                options.inSampleSize == 1;
+    }
+
+    public static Bitmap getBitmapFromReuseableSet(BitmapFactory.Options options){
+        Bitmap bitmap = null;
+        if (mReuseableBitmap != null && !mReuseableBitmap.isEmpty()){
+            synchronized (mReuseableBitmap) {
+                Bitmap item;
+                Iterator<SoftReference<Bitmap>> iterator = mReuseableBitmap.iterator();
+                while (iterator.hasNext()){
+                    item = iterator.next().get();
+                    if (item != null && item.isMutable()){
+                        if (canUseForBitmap(item, options)){
+                            bitmap = item;
+                            iterator.remove();
+                            break;
+                        }
+                    } else {
+                        iterator.remove();
+                    }
+                }
+            }
+        }
+        return bitmap;
     }
 }
