@@ -36,7 +36,7 @@ public class CameraIntentActivity extends AppCompatActivity {
 
     private static final int ACTIVITY_START_CAMERA_APP = 0;
     private static final int REQUEST_EXTERNAL_STORAGE_RESULT = 1;
-    private static LruCache<String, Bitmap> mMemoryCache;
+//    private static LruCache<String, Bitmap> mMemoryCache;
     private ImageView mCaptureView;
     private String mImageFileLocation = "" ;
     private String GALLERY_LOCATION = "image gallery";
@@ -56,7 +56,7 @@ public class CameraIntentActivity extends AppCompatActivity {
         RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder));
         mRecyclerView.setAdapter(imageAdapter);
 
-        final int maxMemorySize = (int) Runtime.getRuntime().maxMemory() / 1024;
+/*        final int maxMemorySize = (int) Runtime.getRuntime().maxMemory() / 1024;
         final int cacheSize = maxMemorySize / 10;
         mMemoryCache = new LruCache<String, Bitmap>(cacheSize){
             @Override
@@ -64,6 +64,7 @@ public class CameraIntentActivity extends AppCompatActivity {
                 return value.getByteCount() / 1024;
             }
         };
+        */
     }
 
     public void takePhoto(View view){
@@ -185,7 +186,7 @@ public class CameraIntentActivity extends AppCompatActivity {
         return files;
     }
 
-    public static Bitmap getBitmapFromMemoryCache(String key){
+/*    public static Bitmap getBitmapFromMemoryCache(String key){
         return mMemoryCache.get(key);
     }
 
@@ -193,5 +194,5 @@ public class CameraIntentActivity extends AppCompatActivity {
         if (getBitmapFromMemoryCache(key) == null) {
             mMemoryCache.put(key, bitmap);
         }
-    }
+    } */
 }
