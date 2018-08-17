@@ -53,11 +53,11 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
         //BitmapWorkerTask workerTask = new BitmapWorkerTask(viewHolder.getImageView());
         //workerTask.execute(imageFile);
         File imageFile = mImageFiles[position];
-/*        Bitmap bitmap = CameraIntentActivity.getBitmapFromMemoryCache(imageFile.getName());
-        if (bitmap!= null){
+        Bitmap bitmap = CameraIntentActivity.getBitmapFromMemoryCache(imageFile.getName());
+        if (bitmap != null){
             viewHolder.getImageView().setImageBitmap(bitmap);
-        } else */
-        if (checkBitmapWorkerTask(imageFile, viewHolder.getImageView())){
+        }
+        else if (checkBitmapWorkerTask(imageFile, viewHolder.getImageView())){
             BitmapWorkerTask bitmapWorkerTask = new BitmapWorkerTask(viewHolder.getImageView());
             AsyncDrawable asyncDrawable = new AsyncDrawable(viewHolder.getImageView().getResources(),
                     placeHolderBitmap,
