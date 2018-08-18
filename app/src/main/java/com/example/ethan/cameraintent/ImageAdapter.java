@@ -11,6 +11,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+
+import com.bumptech.glide.Glide;
+
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.List;
@@ -53,6 +56,10 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
         //BitmapWorkerTask workerTask = new BitmapWorkerTask(viewHolder.getImageView());
         //workerTask.execute(imageFile);
         File imageFile = mImageFiles[position];
+        Glide.with(viewHolder.getImageView().getContext())
+                .load(imageFile)
+                .into(viewHolder.getImageView());
+        /*****
         Bitmap bitmap = CameraIntentActivity.getBitmapFromMemoryCache(imageFile.getName());
         if (bitmap != null){
             viewHolder.getImageView().setImageBitmap(bitmap);
@@ -64,7 +71,7 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
                     bitmapWorkerTask);
             viewHolder.getImageView().setImageDrawable(asyncDrawable);
             bitmapWorkerTask.execute(imageFile);
-        }
+        }*/
     }
 
     @Override

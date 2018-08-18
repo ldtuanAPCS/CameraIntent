@@ -1,11 +1,17 @@
 package com.example.ethan.cameraintent;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
+import android.graphics.SurfaceTexture;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
@@ -21,8 +27,11 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.LruCache;
+import android.util.Size;
+import android.view.TextureView;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import java.io.File;
@@ -30,12 +39,14 @@ import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Array;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 public class CameraIntentActivity extends AppCompatActivity {
@@ -49,6 +60,73 @@ public class CameraIntentActivity extends AppCompatActivity {
     private File mGalleryFolder;
     private RecyclerView mRecyclerView;
     private static Set<SoftReference<Bitmap>> mReuseableBitmap;
+    private TextureView mTextureView;
+    private Size mPreviewSize;
+    private String mCameraId;
+
+    private TextureView.SurfaceTextureListener mSurfaceTextureListener = new TextureView.SurfaceTextureListener() {
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+            setupCamera(width, height);
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+
+        }
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+            return false;
+        }
+
+        @Override
+        public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
+        }
+    };
+
+    private void setupCamera(int width, int height) {
+        CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        try {
+            for (String cameraId : cameraManager.getCameraIdList()){
+                CameraCharacteristics cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId);
+                if (cameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT) {
+                    continue;
+                }
+                StreamConfigurationMap map = cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                mPreviewSize = getPreferredPreviewSize(map.getOutputSizes(SurfaceTexture.class), width, height);
+                mCameraId = cameraId;
+                return;
+            }
+        } catch (CameraAccessException e){
+            e.printStackTrace();
+        }
+    }
+
+    private Size getPreferredPreviewSize(Size[] mapSizes, int width, int height){
+        List<Size> collectorSizes = new ArrayList<>();
+        for (Size option : mapSizes){
+             if (width > height){
+                 if (option.getWidth() > width & option.getHeight() > height) {
+                     collectorSizes.add(option);
+                 }
+             } else {
+                 if (option.getWidth() > height & option.getHeight() > width) {
+                     collectorSizes.add(option);
+                 }
+             }
+        }
+        if (collectorSizes.size() > 0){
+            return Collections.min(collectorSizes, new Comparator<Size>() {
+                @Override
+                public int compare(Size lhs, Size rhs) {
+                    return Long.signum(lhs.getWidth()*lhs.getHeight() - rhs.getWidth()*rhs.getHeight());
+                }
+            });
+        }
+        return  mapSizes[0];
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,6 +161,18 @@ public class CameraIntentActivity extends AppCompatActivity {
         };
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1) {
             mReuseableBitmap = Collections.synchronizedSet(new HashSet<SoftReference<Bitmap>>());
+        }
+        mTextureView = (TextureView) findViewById(R.id.textureView);
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mTextureView.isAvailable()){
+
+        } else {
+            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
     }
 
@@ -218,7 +308,7 @@ public class CameraIntentActivity extends AppCompatActivity {
     private static int getBytePerPixel(Bitmap.Config config){
         if (config == Bitmap.Config.ARGB_8888){
             return 4;
-        } else if (config == Bitmap.Config.RGB_565 || config == Bitmap.Config.ARGB_4444){
+        } else if ((config == Bitmap.Config.RGB_565) || (config == Bitmap.Config.ARGB_4444)){
             return 2;
         } else if (config == Bitmap.Config.ALPHA_8){
             return 1;
