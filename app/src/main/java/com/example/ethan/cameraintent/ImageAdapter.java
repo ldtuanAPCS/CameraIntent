@@ -12,7 +12,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
-import com.bumptech.glide.Glide;
+
+import com.squareup.picasso.Picasso;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -56,6 +57,8 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
         //BitmapWorkerTask workerTask = new BitmapWorkerTask(viewHolder.getImageView());
         //workerTask.execute(imageFile);
         File imageFile = mImageFiles[position];
+        Picasso.get().load(imageFile).resize(200,200).into(viewHolder.getImageView());
+        /*
         Glide.with(viewHolder.getImageView().getContext())
                 .load(imageFile)
                 .into(viewHolder.getImageView());
