@@ -9,9 +9,11 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ExifInterface;
 import android.net.Uri;
@@ -29,6 +31,7 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.LruCache;
 import android.util.Size;
+import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.ImageView;
@@ -65,12 +68,21 @@ public class CameraIntentActivity extends AppCompatActivity {
     private Size mPreviewSize;
     private String mCameraId;
     private CameraDevice mCameraDevice;
+    private CaptureRequest mPreviewCaptureRequest;
+    private CaptureRequest.Builder mPreviewCaptureRequestBuilder;
+    private CameraCaptureSession mCameraCaptureSession;
+    private CameraCaptureSession.CaptureCallback mSessionCaptureCallback = new CameraCaptureSession.CaptureCallback() {
+        @Override
+        public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
+            super.onCaptureStarted(session, request, timestamp, frameNumber);
+        }
+    };
 
     private CameraDevice.StateCallback mCameraDeviceStateCallBack = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
             mCameraDevice = camera;
-            Toast.makeText(CameraIntentActivity.this, "Camera opened!!", Toast.LENGTH_SHORT).show();
+            createCameraPreviewSession();
         }
 
         @Override
@@ -85,6 +97,43 @@ public class CameraIntentActivity extends AppCompatActivity {
             mCameraDevice = null;
         }
     };
+
+
+
+
+    private void createCameraPreviewSession() {
+        try{
+            SurfaceTexture surfaceTexture = mTextureView.getSurfaceTexture();
+            surfaceTexture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+            Surface previewSurface = new Surface(surfaceTexture);
+            mPreviewCaptureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            mPreviewCaptureRequestBuilder.addTarget(previewSurface);
+            mCameraDevice.createCaptureSession(Arrays.asList(previewSurface), new CameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigured(@NonNull CameraCaptureSession session) {
+                    if (mCameraDevice == null) return;
+                    try{
+                        mPreviewCaptureRequest = mPreviewCaptureRequestBuilder.build();
+                        mCameraCaptureSession = session;
+                        mCameraCaptureSession.setRepeatingRequest(
+                                mPreviewCaptureRequest,
+                                mSessionCaptureCallback,
+                                null
+                        );
+                    } catch (CameraAccessException e){
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                    Toast.makeText(CameraIntentActivity.this, "Create camera session failed!", Toast.LENGTH_SHORT).show();
+                }
+            }, null);
+        } catch (CameraAccessException e){
+            e.printStackTrace();
+        }
+    }
 
     private TextureView.SurfaceTextureListener mSurfaceTextureListener = new TextureView.SurfaceTextureListener() {
         @Override
