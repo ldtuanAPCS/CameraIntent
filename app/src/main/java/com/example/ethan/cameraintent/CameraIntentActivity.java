@@ -10,6 +10,7 @@ import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ExifInterface;
@@ -63,11 +64,33 @@ public class CameraIntentActivity extends AppCompatActivity {
     private TextureView mTextureView;
     private Size mPreviewSize;
     private String mCameraId;
+    private CameraDevice mCameraDevice;
+
+    private CameraDevice.StateCallback mCameraDeviceStateCallBack = new CameraDevice.StateCallback() {
+        @Override
+        public void onOpened(@NonNull CameraDevice camera) {
+            mCameraDevice = camera;
+            Toast.makeText(CameraIntentActivity.this, "Camera opened!!", Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void onDisconnected(@NonNull CameraDevice camera) {
+            camera.close();
+            mCameraDevice = null;
+        }
+
+        @Override
+        public void onError(@NonNull CameraDevice camera, int error) {
+            camera.close();
+            mCameraDevice = null;
+        }
+    };
 
     private TextureView.SurfaceTextureListener mSurfaceTextureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
             setupCamera(width, height);
+            openCamera();
         }
 
         @Override
@@ -349,5 +372,14 @@ public class CameraIntentActivity extends AppCompatActivity {
             }
         }
         return bitmap;
+    }
+
+    private void openCamera(){
+        CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        try{
+            cameraManager.openCamera(mCameraId, mCameraDeviceStateCallBack, null);
+        } catch (CameraAccessException e){
+            e.printStackTrace();
+        }
     }
 }
