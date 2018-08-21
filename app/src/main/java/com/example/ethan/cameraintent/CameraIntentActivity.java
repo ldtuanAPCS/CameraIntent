@@ -76,6 +76,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
     private static final int REQUEST_EXTERNAL_STORAGE_RESULT = 1;
     private static final int STATE_PREVIEW = 0;
     private static final int STATE_WAIT_LOCK = 1;
+    private static final String IMAGE_FILE_LOCATION = "image_file_location";
     private int mState;
     private static LruCache<String, Bitmap> mMemoryCache;
     private ImageView mCaptureView;
@@ -139,7 +140,10 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
 
     @Override
     public void getRecyclerViewAdapterPosition(int position) {
-        Toast.makeText(this, Integer.toString(position), Toast.LENGTH_SHORT).show();
+        Intent sendFileAddressIntent = new Intent(this, SimpleImageActivity.class);
+        sendFileAddressIntent.putExtra(IMAGE_FILE_LOCATION,
+                sortFilesToLatest(mGalleryFolder)[position].toString());
+        startActivity(sendFileAddressIntent);
     }
 
     private static class ImageSaver implements Runnable{
