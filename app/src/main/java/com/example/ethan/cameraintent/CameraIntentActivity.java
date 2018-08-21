@@ -612,7 +612,13 @@ public class CameraIntentActivity extends AppCompatActivity {
         }
     }
 
+    private void swapImageAdapter(){
+        RecyclerView.Adapter newImageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder));
+        mRecyclerView.swapAdapter(newImageAdapter, false);
+    }
+
     private void captureStillImage(){
+        Handler uiHandler = new Handler(getMainLooper());
         try {
             CaptureRequest.Builder captureStillBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureStillBuilder.addTarget(mImageReader.getSurface());
@@ -622,11 +628,11 @@ public class CameraIntentActivity extends AppCompatActivity {
                 @Override
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
-                    Toast.makeText(CameraIntentActivity.this, "Image captured!", Toast.LENGTH_SHORT).show();
+                    swapImageAdapter();
                     unlockFocus();
                 }
             };
-            mCameraCaptureSession.capture(captureStillBuilder.build(), captureCallback, null);
+            mCameraCaptureSession.capture(captureStillBuilder.build(), captureCallback, uiHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
