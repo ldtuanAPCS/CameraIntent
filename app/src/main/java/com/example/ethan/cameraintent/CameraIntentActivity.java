@@ -13,7 +13,10 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
+import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ExifInterface;
 import android.net.Uri;
@@ -59,6 +62,9 @@ public class CameraIntentActivity extends AppCompatActivity {
 
     private static final int ACTIVITY_START_CAMERA_APP = 0;
     private static final int REQUEST_EXTERNAL_STORAGE_RESULT = 1;
+    private static final int STATE_PREVIEW = 0;
+    private static final int STATE_WAIT_LOCK = 1;
+    private int mState;
     private static LruCache<String, Bitmap> mMemoryCache;
     private ImageView mCaptureView;
     private String mImageFileLocation = "" ;
@@ -79,6 +85,35 @@ public class CameraIntentActivity extends AppCompatActivity {
         @Override
         public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
             super.onCaptureStarted(session, request, timestamp, frameNumber);
+        }
+
+        @Override
+        public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+            super.onCaptureCompleted(session, request, result);
+            process(result);
+        }
+
+        @Override
+        public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureFailure failure) {
+            super.onCaptureFailed(session, request, failure);
+            Toast.makeText(CameraIntentActivity.this, "Focus lock unsuccessful", Toast.LENGTH_SHORT).show();
+
+        }
+
+        private void process(CaptureResult result){
+            switch (mState){
+                case STATE_PREVIEW:
+                    //Do nothing
+                    break;
+                case STATE_WAIT_LOCK:
+                    Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
+                    if (afState == CaptureRequest.CONTROL_AF_STATE_FOCUSED_LOCKED){
+                        unlockFocus();
+                        Toast.makeText(CameraIntentActivity.this, "Focus lock successful", Toast.LENGTH_SHORT).show();
+                    }
+                    break;
+
+            }
         }
     };
 
@@ -289,6 +324,24 @@ public class CameraIntentActivity extends AppCompatActivity {
         }
     }
 
+    private void callCameraApp(){
+        /*
+        Intent callCameraApplicationIntent = new Intent();
+        callCameraApplicationIntent.setAction(MediaStore.ACTION_IMAGE_CAPTURE);
+        File photoFile = null;
+        try{
+            photoFile = createImageFile();
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+        String authorities = getApplicationContext().getPackageName() + ".fileprovider";
+        Uri imageUri = FileProvider.getUriForFile(this, authorities, photoFile);
+        callCameraApplicationIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+        startActivityForResult(callCameraApplicationIntent, ACTIVITY_START_CAMERA_APP);
+        */
+        lockFocus();
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == REQUEST_EXTERNAL_STORAGE_RESULT){
@@ -302,20 +355,6 @@ public class CameraIntentActivity extends AppCompatActivity {
         }
     }
 
-    private void callCameraApp(){
-        Intent callCameraApplicationIntent = new Intent();
-        callCameraApplicationIntent.setAction(MediaStore.ACTION_IMAGE_CAPTURE);
-        File photoFile = null;
-        try{
-            photoFile = createImageFile();
-        } catch (IOException e){
-            e.printStackTrace();
-        }
-        String authorities = getApplicationContext().getPackageName() + ".fileprovider";
-        Uri imageUri = FileProvider.getUriForFile(this, authorities, photoFile);
-        callCameraApplicationIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
-        startActivityForResult(callCameraApplicationIntent, ACTIVITY_START_CAMERA_APP);
-    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
@@ -469,6 +508,30 @@ public class CameraIntentActivity extends AppCompatActivity {
             mBackroundThread = null;
             mBackgroundHandler = null;
         } catch (InterruptedException e){
+            e.printStackTrace();
+        }
+    }
+
+    private void lockFocus(){
+        try {
+            mState = STATE_WAIT_LOCK;
+            mPreviewCaptureRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
+                    CaptureRequest.CONTROL_AF_TRIGGER_START);
+            mCameraCaptureSession.capture(mPreviewCaptureRequestBuilder.build(),
+                    mSessionCaptureCallback, mBackgroundHandler);
+        } catch (CameraAccessException e){
+            e.printStackTrace();
+        }
+    }
+
+    private void unlockFocus(){
+        try {
+            mState = STATE_PREVIEW;
+            mPreviewCaptureRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
+                    CaptureRequest.CONTROL_AF_TRIGGER_CANCEL);
+            mCameraCaptureSession.capture(mPreviewCaptureRequestBuilder.build(),
+                    mSessionCaptureCallback, mBackgroundHandler);
+        } catch (CameraAccessException e){
             e.printStackTrace();
         }
     }
