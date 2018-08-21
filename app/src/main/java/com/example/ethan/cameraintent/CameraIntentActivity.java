@@ -64,7 +64,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-public class CameraIntentActivity extends AppCompatActivity {
+public class CameraIntentActivity extends AppCompatActivity implements RecyclerViewClickPositionInterface {
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
@@ -136,6 +136,11 @@ public class CameraIntentActivity extends AppCompatActivity {
             }
         }
     };
+
+    @Override
+    public void getRecyclerViewAdapterPosition(int position) {
+        Toast.makeText(this, Integer.toString(position), Toast.LENGTH_SHORT).show();
+    }
 
     private static class ImageSaver implements Runnable{
         private final Image mImage;
@@ -309,13 +314,11 @@ public class CameraIntentActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera_intent);
         createImageGallery();
-//        mCaptureView = (ImageView) findViewById(R.id.capturePhotoImageView);
-
         mRecyclerView = (RecyclerView) findViewById(R.id.galleryRecyclerView);
         GridLayoutManager layoutManager = new GridLayoutManager(this, 1);
         layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
         mRecyclerView.setLayoutManager(layoutManager);
-        RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder));
+        RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder), this);
         mRecyclerView.setAdapter(imageAdapter);
 
         final int maxMemorySize = (int) Runtime.getRuntime().maxMemory() / 1024;
@@ -437,7 +440,7 @@ public class CameraIntentActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ACTIVITY_START_CAMERA_APP && resultCode == RESULT_OK){
 //            rotateImage(setReducedImageSize());
-            RecyclerView.Adapter newImageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder));
+            RecyclerView.Adapter newImageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder), this);
             mRecyclerView.swapAdapter(newImageAdapter, false);
         }
     }
@@ -613,7 +616,7 @@ public class CameraIntentActivity extends AppCompatActivity {
     }
 
     private void swapImageAdapter(){
-        RecyclerView.Adapter newImageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder));
+        RecyclerView.Adapter newImageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder), this);
         mRecyclerView.swapAdapter(newImageAdapter, false);
     }
 
