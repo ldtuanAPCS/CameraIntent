@@ -79,8 +79,9 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
 
     @Override
     public int getItemCount() {
-        //return imagesFile.listFiles().length;
-        return mImageFiles.length;
+        if (mImageFiles != null) {
+            return mImageFiles.length;
+        } else return 0;
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener{

@@ -185,7 +185,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
             try {
                 fileOutputStream = new FileOutputStream(mImageFile);
                 fileOutputStream.write(bytes);
-            } catch (IOException e){
+            } catch (IOException | NullPointerException e){
                 e.printStackTrace();
             } finally {
                 mImage.close();
@@ -348,6 +348,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera_intent);
         createImageGallery();
+        //openBackgroundThread();
         mRecyclerView = (RecyclerView) findViewById(R.id.galleryRecyclerView);
         GridLayoutManager layoutManager = new GridLayoutManager(this, 1);
         layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
@@ -560,12 +561,14 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
 
     private File[] sortFilesToLatest(File fileImagesDir){
         File[] files = fileImagesDir.listFiles();
-        Arrays.sort(files, new Comparator<File>() {
-            @Override
-            public int compare(File lhs, File rhs) {
-                return Long.valueOf(rhs.lastModified()).compareTo(lhs.lastModified());
-            }
-        });
+        if (files != null) {
+            Arrays.sort(files, new Comparator<File>() {
+                @Override
+                public int compare(File lhs, File rhs) {
+                    return Long.valueOf(rhs.lastModified()).compareTo(lhs.lastModified());
+                }
+            });
+        }
         return files;
     }
 
@@ -708,8 +711,12 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
                     } catch (IOException e){
                         e.printStackTrace();
                     }
-                    String authorities = getApplicationContext().getPackageName() + ".fileprovider";
-                    Uri imageUri = FileProvider.getUriForFile(getApplicationContext(), authorities, mImageFile);
+                    /*try {
+                        String authorities = getApplicationContext().getPackageName() + ".fileprovider";
+                        Uri imageUri = FileProvider.getUriForFile(getApplicationContext(), authorities, mImageFile);
+                    } catch (NullPointerException e){
+                        e.printStackTrace();
+                    }*/
                 }
 
                 @Override
