@@ -11,9 +11,9 @@ import java.lang.ref.WeakReference;
 
 public class SingleImageBitmapWorkerTask extends AsyncTask<File, Void, Bitmap>{
 
-    WeakReference<ImageView> imageViewReferences;
-    final int TARGET_IMAGE_VIEW_WIDTH;
-    final int TARGET_IMAGE_VIEW_HEIGHT;
+    private WeakReference<ImageView> imageViewReferences;
+    private final int TARGET_IMAGE_VIEW_WIDTH;
+    private final int TARGET_IMAGE_VIEW_HEIGHT;
     private File mImageFile;
 
     public SingleImageBitmapWorkerTask(ImageView imageView, int width, int height){
@@ -25,21 +25,12 @@ public class SingleImageBitmapWorkerTask extends AsyncTask<File, Void, Bitmap>{
     @Override
     protected Bitmap doInBackground(File... params) {
         mImageFile = params[0];
-//        return decodeBitmapFromFile(params[0]);
         Bitmap bitmap = decodeBitmapFromFile(mImageFile);
         return bitmap;
     }
 
     @Override
     protected void onPostExecute(Bitmap bitmap) {
-        /*
-        if (bitmap != null && imageViewReferences != null){
-            ImageView viewImage = imageViewReferences.get();
-            if (viewImage != null){
-                viewImage.setImageBitmap(bitmap);
-            }
-        }
-        */
         if (bitmap != null && imageViewReferences != null){
             ImageView imageView = imageViewReferences.get();
             if (imageView != null){

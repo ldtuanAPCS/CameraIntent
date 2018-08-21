@@ -11,9 +11,9 @@ import java.lang.ref.WeakReference;
 
 public class BitmapWorkerTask extends AsyncTask<File, Void, Bitmap>{
 
-    WeakReference<ImageView> imageViewReferences;
-    final static int TARGET_IMAGE_VIEW_WIDTH = 200;
-    final static int TARGET_IMAGE_VIEW_HEIGHT = 200;
+    private WeakReference<ImageView> imageViewReferences;
+    private final static int TARGET_IMAGE_VIEW_WIDTH = 200;
+    private final static int TARGET_IMAGE_VIEW_HEIGHT = 200;
     private File mImageFile;
 
     public BitmapWorkerTask(ImageView imageView){
@@ -23,7 +23,6 @@ public class BitmapWorkerTask extends AsyncTask<File, Void, Bitmap>{
     @Override
     protected Bitmap doInBackground(File... params) {
         mImageFile = params[0];
-//        return decodeBitmapFromFile(params[0]);
         Bitmap bitmap = decodeBitmapFromFile(mImageFile);
         CameraIntentActivity.setBitmapToMemoryCache(mImageFile.getName(), bitmap);
         return bitmap;
@@ -31,14 +30,6 @@ public class BitmapWorkerTask extends AsyncTask<File, Void, Bitmap>{
 
     @Override
     protected void onPostExecute(Bitmap bitmap) {
-        /*
-        if (bitmap != null && imageViewReferences != null){
-            ImageView viewImage = imageViewReferences.get();
-            if (viewImage != null){
-                viewImage.setImageBitmap(bitmap);
-            }
-        }
-        */
         if (isCancelled()){
             bitmap = null;
         }
@@ -46,7 +37,7 @@ public class BitmapWorkerTask extends AsyncTask<File, Void, Bitmap>{
             ImageView imageView = imageViewReferences.get();
             if (imageView != null){
                 BitmapWorkerTask bitmapWorkerTask = ImageAdapter.getBitmapWorkerTask(imageView);
-                if (this == bitmapWorkerTask && imageView != null){
+                if (this == bitmapWorkerTask){
                     imageView.setImageBitmap(bitmap);
                 }
             }

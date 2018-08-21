@@ -19,7 +19,6 @@ import java.lang.ref.WeakReference;
 
 public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
     private File[] mImageFiles;
-    private Bitmap placeHolderBitmap;
     private static RecyclerViewClickPositionInterface mPositionInterface;
 
     public static class AsyncDrawable extends BitmapDrawable{
@@ -53,28 +52,8 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder viewHolder, int position) {
-        //File imageFile = imagesFile.listFiles()[position];
-        //BitmapWorkerTask workerTask = new BitmapWorkerTask(viewHolder.getImageView());
-        //workerTask.execute(imageFile);
         File imageFile = mImageFiles[position];
         Picasso.get().load(imageFile).resize(200,200).into(viewHolder.getImageView());
-        /*
-        Glide.with(viewHolder.getImageView().getContext())
-                .load(imageFile)
-                .into(viewHolder.getImageView());
-        /*****
-        Bitmap bitmap = CameraIntentActivity.getBitmapFromMemoryCache(imageFile.getName());
-        if (bitmap != null){
-            viewHolder.getImageView().setImageBitmap(bitmap);
-        }
-        else if (checkBitmapWorkerTask(imageFile, viewHolder.getImageView())){
-            BitmapWorkerTask bitmapWorkerTask = new BitmapWorkerTask(viewHolder.getImageView());
-            AsyncDrawable asyncDrawable = new AsyncDrawable(viewHolder.getImageView().getResources(),
-                    placeHolderBitmap,
-                    bitmapWorkerTask);
-            viewHolder.getImageView().setImageDrawable(asyncDrawable);
-            bitmapWorkerTask.execute(imageFile);
-        }*/
     }
 
     @Override
@@ -101,22 +80,6 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
         public void onClick(View v) {
             mPositionInterface.getRecyclerViewAdapterPosition(this.getPosition());
         }
-    }
-
-    public static boolean checkBitmapWorkerTask(File imagesFile, ImageView imageView){
-        BitmapWorkerTask bitmapWorkerTask = getBitmapWorkerTask(imageView);
-        if (bitmapWorkerTask != null){
-            final File workerFile = bitmapWorkerTask.getImageFile();
-            if (workerFile != null){
-                if (workerFile != imagesFile){
-                    bitmapWorkerTask.cancel(true);
-                } else {
-                    //bitmap worker task is the same as the imageview is expecting
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 
     public static BitmapWorkerTask getBitmapWorkerTask(ImageView imageView){
