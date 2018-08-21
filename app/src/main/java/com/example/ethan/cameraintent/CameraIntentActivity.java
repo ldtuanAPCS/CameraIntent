@@ -19,6 +19,8 @@ import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -71,6 +73,8 @@ public class CameraIntentActivity extends AppCompatActivity {
     private CaptureRequest mPreviewCaptureRequest;
     private CaptureRequest.Builder mPreviewCaptureRequestBuilder;
     private CameraCaptureSession mCameraCaptureSession;
+    private HandlerThread mBackroundThread;
+    private Handler mBackgroundHandler;
     private CameraCaptureSession.CaptureCallback mSessionCaptureCallback = new CameraCaptureSession.CaptureCallback() {
         @Override
         public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
@@ -118,7 +122,7 @@ public class CameraIntentActivity extends AppCompatActivity {
                         mCameraCaptureSession.setRepeatingRequest(
                                 mPreviewCaptureRequest,
                                 mSessionCaptureCallback,
-                                null
+                                mBackgroundHandler
                         );
                     } catch (CameraAccessException e){
                         e.printStackTrace();
@@ -241,10 +245,30 @@ public class CameraIntentActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        openBackgroundThread();
         if (mTextureView.isAvailable()){
-
+            setupCamera(mTextureView.getWidth(), mTextureView.getHeight());
+            openCamera();
         } else {
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        closeCamera();
+        closeBackgroundThread();
+        super.onPause();
+    }
+
+    private void closeCamera() {
+        if (mCameraCaptureSession != null){
+            mCameraCaptureSession.close();
+            mCameraCaptureSession = null;
+        }
+        if (mCameraDevice != null){
+            mCameraDevice.close();
+            mCameraDevice = null;
         }
     }
 
@@ -426,8 +450,25 @@ public class CameraIntentActivity extends AppCompatActivity {
     private void openCamera(){
         CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try{
-            cameraManager.openCamera(mCameraId, mCameraDeviceStateCallBack, null);
+            cameraManager.openCamera(mCameraId, mCameraDeviceStateCallBack, mBackgroundHandler);
         } catch (CameraAccessException e){
+            e.printStackTrace();
+        }
+    }
+
+    private void openBackgroundThread(){
+        mBackroundThread = new HandlerThread("Camera background thread");
+        mBackroundThread.start();
+        mBackgroundHandler = new Handler(mBackroundThread.getLooper());
+    }
+
+    private void closeBackgroundThread(){
+        mBackroundThread.quitSafely();
+        try{
+            mBackroundThread.join();
+            mBackroundThread = null;
+            mBackgroundHandler = null;
+        } catch (InterruptedException e){
             e.printStackTrace();
         }
     }
