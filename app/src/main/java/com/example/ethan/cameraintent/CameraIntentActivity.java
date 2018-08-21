@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -19,6 +20,8 @@ import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ExifInterface;
+import android.media.Image;
+import android.media.ImageReader;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -44,9 +47,11 @@ import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Array;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -70,6 +75,7 @@ public class CameraIntentActivity extends AppCompatActivity {
     private String mImageFileLocation = "" ;
     private String GALLERY_LOCATION = "image gallery";
     private File mGalleryFolder;
+    private static File mImageFile;
     private RecyclerView mRecyclerView;
     private static Set<SoftReference<Bitmap>> mReuseableBitmap;
     private TextureView mTextureView;
@@ -81,6 +87,14 @@ public class CameraIntentActivity extends AppCompatActivity {
     private CameraCaptureSession mCameraCaptureSession;
     private HandlerThread mBackroundThread;
     private Handler mBackgroundHandler;
+    private ImageReader mImageReader;
+    private final ImageReader.OnImageAvailableListener mOnImageAvailableListener = new ImageReader.OnImageAvailableListener() {
+        @Override
+        public void onImageAvailable(ImageReader reader) {
+            mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage()));
+        }
+    };
+
     private CameraCaptureSession.CaptureCallback mSessionCaptureCallback = new CameraCaptureSession.CaptureCallback() {
         @Override
         public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
@@ -116,6 +130,38 @@ public class CameraIntentActivity extends AppCompatActivity {
             }
         }
     };
+
+    private static class ImageSaver implements Runnable{
+        private final Image mImage;
+
+        private ImageSaver (Image image){
+            mImage = image;
+        }
+
+        @Override
+        public void run() {
+            ByteBuffer byteBuffer = mImage.getPlanes()[0].getBuffer();
+            byte[] bytes = new byte[byteBuffer.remaining()];
+            byteBuffer.get(bytes);
+
+            FileOutputStream fileOutputStream = null;
+            try {
+                fileOutputStream = new FileOutputStream(mImageFile);
+                fileOutputStream.write(bytes);
+            } catch (IOException e){
+                e.printStackTrace();
+            } finally {
+                mImage.close();
+                if (fileOutputStream != null){
+                    try {
+                        fileOutputStream.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
 
     private CameraDevice.StateCallback mCameraDeviceStateCallBack = new CameraDevice.StateCallback() {
         @Override
@@ -206,6 +252,19 @@ public class CameraIntentActivity extends AppCompatActivity {
                     continue;
                 }
                 StreamConfigurationMap map = cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                Size largestImageSize = Collections.max(
+                        Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+                        new Comparator<Size>() {
+                            @Override
+                            public int compare(Size lhs, Size rhs) {
+                                return Long.signum(lhs.getWidth()*lhs.getHeight() - rhs.getWidth()*rhs.getHeight());
+                            }
+                        }
+                );
+                mImageReader = ImageReader.newInstance(largestImageSize.getWidth(),
+                        largestImageSize.getHeight(),
+                        ImageFormat.JPEG, 1);
+                mImageReader.setOnImageAvailableListener(mOnImageAvailableListener, mBackgroundHandler);
                 mPreviewSize = getPreferredPreviewSize(map.getOutputSizes(SurfaceTexture.class), width, height);
                 mCameraId = cameraId;
                 return;
@@ -339,6 +398,13 @@ public class CameraIntentActivity extends AppCompatActivity {
         callCameraApplicationIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
         startActivityForResult(callCameraApplicationIntent, ACTIVITY_START_CAMERA_APP);
         */
+        try{
+            mImageFile = createImageFile();
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+        String authorities = getApplicationContext().getPackageName() + ".fileprovider";
+        Uri imageUri = FileProvider.getUriForFile(this, authorities, mImageFile);
         lockFocus();
     }
 
