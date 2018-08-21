@@ -39,6 +39,7 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.LruCache;
 import android.util.Size;
+import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
@@ -64,7 +65,13 @@ import java.util.List;
 import java.util.Set;
 
 public class CameraIntentActivity extends AppCompatActivity {
-
+    private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+    static {
+        ORIENTATIONS.append(Surface.ROTATION_0, 90);
+        ORIENTATIONS.append(Surface.ROTATION_90, 0);
+        ORIENTATIONS.append(Surface.ROTATION_180, 270);
+        ORIENTATIONS.append(Surface.ROTATION_270, 180);
+    }
     private static final int ACTIVITY_START_CAMERA_APP = 0;
     private static final int REQUEST_EXTERNAL_STORAGE_RESULT = 1;
     private static final int STATE_PREVIEW = 0;
@@ -122,8 +129,7 @@ public class CameraIntentActivity extends AppCompatActivity {
                 case STATE_WAIT_LOCK:
                     Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
                     if (afState == CaptureRequest.CONTROL_AF_STATE_FOCUSED_LOCKED){
-                        unlockFocus();
-                        Toast.makeText(CameraIntentActivity.this, "Focus lock successful", Toast.LENGTH_SHORT).show();
+                        captureStillImage();
                     }
                     break;
 
@@ -193,7 +199,7 @@ public class CameraIntentActivity extends AppCompatActivity {
             Surface previewSurface = new Surface(surfaceTexture);
             mPreviewCaptureRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             mPreviewCaptureRequestBuilder.addTarget(previewSurface);
-            mCameraDevice.createCaptureSession(Arrays.asList(previewSurface), new CameraCaptureSession.StateCallback() {
+            mCameraDevice.createCaptureSession(Arrays.asList(previewSurface, mImageReader.getSurface()), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     if (mCameraDevice == null) return;
@@ -363,6 +369,10 @@ public class CameraIntentActivity extends AppCompatActivity {
         if (mCameraDevice != null){
             mCameraDevice.close();
             mCameraDevice = null;
+        }
+        if (mImageReader != null){
+            mImageReader.close();
+            mImageReader = null;
         }
     }
 
@@ -598,6 +608,26 @@ public class CameraIntentActivity extends AppCompatActivity {
             mCameraCaptureSession.capture(mPreviewCaptureRequestBuilder.build(),
                     mSessionCaptureCallback, mBackgroundHandler);
         } catch (CameraAccessException e){
+            e.printStackTrace();
+        }
+    }
+
+    private void captureStillImage(){
+        try {
+            CaptureRequest.Builder captureStillBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            captureStillBuilder.addTarget(mImageReader.getSurface());
+            int rotation = getWindowManager().getDefaultDisplay().getRotation();
+            captureStillBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
+            CameraCaptureSession.CaptureCallback captureCallback = new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+                    super.onCaptureCompleted(session, request, result);
+                    Toast.makeText(CameraIntentActivity.this, "Image captured!", Toast.LENGTH_SHORT).show();
+                    unlockFocus();
+                }
+            };
+            mCameraCaptureSession.capture(captureStillBuilder.build(), captureCallback, null);
+        } catch (CameraAccessException e) {
             e.printStackTrace();
         }
     }
