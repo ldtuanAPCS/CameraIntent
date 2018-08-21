@@ -78,6 +78,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
     }
     private static final int ACTIVITY_START_CAMERA_APP = 0;
     private static final int REQUEST_EXTERNAL_STORAGE_RESULT = 1;
+    private static final int REQUEST_CAMERA_RESULT = 2;
     private static final int STATE_PREVIEW = 0;
     private static final int STATE_WAIT_LOCK = 1;
     private static final int STATE_PICTURE_CAPTURED = 2;
@@ -145,7 +146,8 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
                     break;
                 case STATE_WAIT_LOCK:
                     Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
-                    if (afState == CaptureRequest.CONTROL_AF_STATE_FOCUSED_LOCKED){
+                    if (afState == CaptureRequest.CONTROL_AF_STATE_FOCUSED_LOCKED ||
+                            afState == CaptureRequest.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED){
                         mState = STATE_PICTURE_CAPTURED;
                         captureStillImage();
                     }
@@ -350,8 +352,21 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
         GridLayoutManager layoutManager = new GridLayoutManager(this, 1);
         layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
         mRecyclerView.setLayoutManager(layoutManager);
-        RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder), this);
-        mRecyclerView.setAdapter(imageAdapter);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                    PackageManager.PERMISSION_GRANTED){
+                RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder), this);
+                mRecyclerView.setAdapter(imageAdapter);
+            } else {
+                if (shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)){
+                    Toast.makeText(this, "We need write permission to start the gallery and save images", Toast.LENGTH_SHORT).show();
+                }
+                requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_EXTERNAL_STORAGE_RESULT);
+            }
+        } else {
+            RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder), this);
+            mRecyclerView.setAdapter(imageAdapter);
+        }
 
         final int maxMemorySize = (int) Runtime.getRuntime().maxMemory() / 1024;
         final int cacheSize = maxMemorySize / 20;
@@ -449,7 +464,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if (requestCode == REQUEST_EXTERNAL_STORAGE_RESULT){
+        /*if (requestCode == REQUEST_EXTERNAL_STORAGE_RESULT){
             if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
                 callCameraApp();
             } else {
@@ -457,6 +472,25 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
             }
         } else {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }*/
+        if (grantResults.length > 0) {
+            switch (requestCode) {
+                case REQUEST_CAMERA_RESULT:
+                    if (grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+                        Toast.makeText(this, "Cannot run application because camera service permissions have not been granted", Toast.LENGTH_SHORT).show();
+                    }
+                    break;
+                case REQUEST_EXTERNAL_STORAGE_RESULT:
+                    if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                        RecyclerView.Adapter imageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder), this);
+                        mRecyclerView.setAdapter(imageAdapter);
+                    } else {
+                        Toast.makeText(this, "Don't have permission to start gallery or save images", Toast.LENGTH_SHORT).show();
+                    }
+                    break;
+                default:
+                    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+            }
         }
     }
 
@@ -594,7 +628,20 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
     private void openCamera(){
         CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try{
-            cameraManager.openCamera(mCameraId, mCameraDeviceStateCallBack, mBackgroundHandler);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED){
+                    cameraManager.openCamera(mCameraId, mCameraDeviceStateCallBack, mBackgroundHandler);
+                } else {
+                    if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)){
+                        Toast.makeText(this, "No permission to use the camera services", Toast.LENGTH_SHORT).show();
+                    }
+                    requestPermissions(new String[] {Manifest.permission.CAMERA},
+                            REQUEST_CAMERA_RESULT);
+                }
+            } else {
+                cameraManager.openCamera(mCameraId, mCameraDeviceStateCallBack, mBackgroundHandler);
+            }
         } catch (CameraAccessException e){
             e.printStackTrace();
         }
