@@ -2,7 +2,6 @@ package com.example.ethan.cameraintent;
 
 import android.content.res.Resources;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.support.annotation.NonNull;
@@ -17,7 +16,6 @@ import com.squareup.picasso.Picasso;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
-import java.util.List;
 
 public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder>{
     private File[] mImageFiles;

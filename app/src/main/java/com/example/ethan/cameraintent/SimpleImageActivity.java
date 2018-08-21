@@ -26,7 +26,6 @@ public class SimpleImageActivity extends AppCompatActivity{
         File imageFile = new File(
                 getIntent().getStringExtra(IMAGE_FILE_LOCATION)
         );
-
         SingleImageBitmapWorkerTask workerTask = new SingleImageBitmapWorkerTask(imageView, width, height);
         workerTask.execute(imageFile);
     }

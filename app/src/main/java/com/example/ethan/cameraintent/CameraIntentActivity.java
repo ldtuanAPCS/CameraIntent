@@ -1,6 +1,7 @@
 package com.example.ethan.cameraintent;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -28,6 +29,8 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
+import android.os.Message;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -77,6 +80,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
     private static final int REQUEST_EXTERNAL_STORAGE_RESULT = 1;
     private static final int STATE_PREVIEW = 0;
     private static final int STATE_WAIT_LOCK = 1;
+    private static final int STATE_PICTURE_CAPTURED = 2;
     private static final String IMAGE_FILE_LOCATION = "image_file_location";
     private int mState;
     private static LruCache<String, Bitmap> mMemoryCache;
@@ -97,10 +101,21 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
     private HandlerThread mBackroundThread;
     private Handler mBackgroundHandler;
     private ImageReader mImageReader;
+    private Activity mActivity;
+    private static Uri mRequestingAppUri;
+
+    private final Handler mUIHandler = new Handler(Looper.getMainLooper()){
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            swapImageAdapter();
+        }
+    };
+
     private final ImageReader.OnImageAvailableListener mOnImageAvailableListener = new ImageReader.OnImageAvailableListener() {
         @Override
         public void onImageAvailable(ImageReader reader) {
-            mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage()));
+            mBackgroundHandler.post(new ImageSaver(mActivity, reader.acquireNextImage(), mUIHandler));
         }
     };
 
@@ -131,6 +146,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
                 case STATE_WAIT_LOCK:
                     Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
                     if (afState == CaptureRequest.CONTROL_AF_STATE_FOCUSED_LOCKED){
+                        mState = STATE_PICTURE_CAPTURED;
                         captureStillImage();
                     }
                     break;
@@ -149,9 +165,13 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
 
     private static class ImageSaver implements Runnable{
         private final Image mImage;
+        private final Activity mActivity;
+        private final Handler mHandler;
 
-        private ImageSaver (Image image){
+        private ImageSaver (Activity activity, Image image, Handler handler){
+            mActivity = activity;
             mImage = image;
+            mHandler = handler;
         }
 
         @Override
@@ -159,7 +179,6 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
             ByteBuffer byteBuffer = mImage.getPlanes()[0].getBuffer();
             byte[] bytes = new byte[byteBuffer.remaining()];
             byteBuffer.get(bytes);
-
             FileOutputStream fileOutputStream = null;
             try {
                 fileOutputStream = new FileOutputStream(mImageFile);
@@ -175,6 +194,13 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
                         e.printStackTrace();
                     }
                 }
+                if (mRequestingAppUri != null){
+                    mRequestingAppUri = null;
+                    mActivity.setResult(RESULT_OK);
+                    mActivity.finish();
+                }
+                Message message = mHandler.obtainMessage();
+                message.sendToTarget();
             }
         }
     }
@@ -394,7 +420,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
                 callCameraApp();
             } else {
                 if (shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-                    Toast.makeText(this, "Exxternal storage permission required to save images", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "External storage permission required to save images", Toast.LENGTH_SHORT).show();
                 }
                 requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_EXTERNAL_STORAGE_RESULT);
             }
@@ -418,13 +444,6 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
         callCameraApplicationIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
         startActivityForResult(callCameraApplicationIntent, ACTIVITY_START_CAMERA_APP);
         */
-        try{
-            mImageFile = createImageFile();
-        } catch (IOException e){
-            e.printStackTrace();
-        }
-        String authorities = getApplicationContext().getPackageName() + ".fileprovider";
-        Uri imageUri = FileProvider.getUriForFile(this, authorities, mImageFile);
         lockFocus();
     }
 
@@ -446,7 +465,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == ACTIVITY_START_CAMERA_APP && resultCode == RESULT_OK){
-//            rotateImage(setReducedImageSize());
+            //rotateImage(setReducedImageSize());
             RecyclerView.Adapter newImageAdapter = new ImageAdapter(sortFilesToLatest(mGalleryFolder), this);
             mRecyclerView.swapAdapter(newImageAdapter, false);
         }
@@ -468,7 +487,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
         mImageFileLocation = image.getAbsolutePath();
         return image;
     }
-
+    /*
     private Bitmap setReducedImageSize(){
         int targetImageViewWidth = mCaptureView.getWidth();
         int targetImageViewHeight = mCaptureView.getHeight();
@@ -503,7 +522,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
         }
         Bitmap rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
         mCaptureView.setImageBitmap(rotatedBitmap);
-    }
+    }*/
 
     private File[] sortFilesToLatest(File fileImagesDir){
         File[] files = fileImagesDir.listFiles();
@@ -615,7 +634,7 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
             mState = STATE_PREVIEW;
             mPreviewCaptureRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
                     CaptureRequest.CONTROL_AF_TRIGGER_CANCEL);
-            mCameraCaptureSession.capture(mPreviewCaptureRequestBuilder.build(),
+            mCameraCaptureSession.setRepeatingRequest(mPreviewCaptureRequestBuilder.build(),
                     mSessionCaptureCallback, mBackgroundHandler);
         } catch (CameraAccessException e){
             e.printStackTrace();
@@ -628,7 +647,6 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
     }
 
     private void captureStillImage(){
-        Handler uiHandler = new Handler(getMainLooper());
         try {
             CaptureRequest.Builder captureStillBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
             captureStillBuilder.addTarget(mImageReader.getSurface());
@@ -636,13 +654,25 @@ public class CameraIntentActivity extends AppCompatActivity implements RecyclerV
             captureStillBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
             CameraCaptureSession.CaptureCallback captureCallback = new CameraCaptureSession.CaptureCallback() {
                 @Override
+                public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
+                    super.onCaptureStarted(session, request, timestamp, frameNumber);
+                    try{
+                        mImageFile = createImageFile();
+                    } catch (IOException e){
+                        e.printStackTrace();
+                    }
+                    String authorities = getApplicationContext().getPackageName() + ".fileprovider";
+                    Uri imageUri = FileProvider.getUriForFile(getApplicationContext(), authorities, mImageFile);
+                }
+
+                @Override
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
-                    swapImageAdapter();
                     unlockFocus();
                 }
             };
-            mCameraCaptureSession.capture(captureStillBuilder.build(), captureCallback, uiHandler);
+            mCameraCaptureSession.stopRepeating();
+            mCameraCaptureSession.capture(captureStillBuilder.build(), captureCallback, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
